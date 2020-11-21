@@ -28,7 +28,7 @@ class CharDictionary(object):
     def __init__(self, path):
         self.chars = get_chars(path)
         self.idx2char = list(self.chars)
-        self.char2idx = {ch: ii for ii, ch in enumerate(self.int2char)}
+        self.char2idx = {ch: ii for ii, ch in enumerate(self.idx2char)}
 
     def __len__(self):
         return len(self.idx2char)
