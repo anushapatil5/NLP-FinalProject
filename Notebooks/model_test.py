@@ -116,7 +116,7 @@ class TensoredDataset(Dataset):
         return (self.input_tensors[idx], self.target_tensors[idx])
 
 
-USE_CHARS = True
+USE_CHARS = False
 
 personachat_dataset = load_personachat('personachat/', use_chars=USE_CHARS)
 persona_dict = Dictionary(personachat_dataset, include_valid=True)
@@ -235,13 +235,13 @@ print("MODEL: ", model)
 
 plot_cache = []
 
-for epoch_number in tqdm(range(100)):
+for epoch_number in range(100):
     avg_loss = 0
     if not load_pretrained:
         # do train
         model.train()
         train_log_cache = []
-        for i, (inp, target) in enumerate(persona_loaders['train']):
+        for i, (inp, target) in tqdm(enumerate(persona_loaders['train'])):
             optimizer.zero_grad()
             inp = inp.to(current_device)
             target = target.to(current_device)
