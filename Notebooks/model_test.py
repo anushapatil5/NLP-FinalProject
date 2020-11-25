@@ -118,6 +118,11 @@ class TensoredDataset(Dataset):
 
 USE_CHARS = False
 
+# TODO: Check if we are taking all characters.
+# TODO: Make another model for LSTM.
+# TODO: Save states for model by loangauge and model type
+# TODO: General checkup.
+
 personachat_dataset = load_personachat('personachat/', use_chars=USE_CHARS)
 persona_dict = Dictionary(personachat_dataset, include_valid=True)
 print("Hello")
