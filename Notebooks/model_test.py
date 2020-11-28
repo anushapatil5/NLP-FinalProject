@@ -13,11 +13,11 @@ import numpy as np
 from numpy import inf
 import matplotlib.pyplot as plt
 
-def load_personachat(basedir, use_chars=False):
+def load_wiki(basedir, use_chars=False):
     datasets_fnames = {
-        'train': os.path.join(basedir, 'personachat_all_sentences_train.jsonl'),
-        'valid': os.path.join(basedir, 'personachat_all_sentences_valid.jsonl'),
-        'test': os.path.join(basedir, 'personachat_all_sentences_test.jsonl'),
+        'train': os.path.join(basedir, 'en_train.jsonl'),
+        'valid': os.path.join(basedir, 'en_valid.jsonl'),
+        'test': os.path.join(basedir, 'en_test.jsonl'),
     }
     datasets_text = {
         'train': [],
@@ -80,11 +80,11 @@ class Dictionary(object): #maps words to indices
 
 USE_CHARS = False   # True to build a character dictionary
 
-personachat_dataset = load_personachat('./', use_chars=USE_CHARS)
-persona_dict = Dictionary(personachat_dataset, include_valid=True)
+wiki_dataset = load_wiki('./', use_chars=USE_CHARS)
+wiki_dict = Dictionary(wiki_dataset, include_valid=True)
 
-personachat_tokenized_datasets = tokenize_dataset(personachat_dataset, persona_dict)
-persona_tensor_dataset = {}
+wiki_tokenized_datasets = tokenize_dataset(wiki_dataset, wiki_dict)
+wiki_tensor_dataset = {}
 
 def pad_strings(minibatch):
     max_len_sample = max(len(i.split(' ')) for i in minibatch)
@@ -123,11 +123,11 @@ class TensoredDataset():
         # return a (input, target) tuple
         return (self.input_tensors[idx], self.target_tensors[idx])
 
-personachat_tokenized_datasets = tokenize_dataset(personachat_dataset, persona_dict)
-persona_tensor_dataset = {}
+wiki_tokenized_datasets = tokenize_dataset(wiki_dataset, wiki_dict)
+wiki_tensor_dataset = {}
 
-for split, listoflists in personachat_tokenized_datasets.items():
-    persona_tensor_dataset[split] = TensoredDataset(listoflists)
+for split, listoflists in wiki_tokenized_datasets.items():
+    wiki_tensor_dataset[split] = TensoredDataset(listoflists)
 
 def pad_list_of_tensors(list_of_tensors, pad_token):
     max_length = max([t.size(-1) for t in list_of_tensors])
@@ -144,17 +144,17 @@ def pad_list_of_tensors(list_of_tensors, pad_token):
 def pad_collate_fn(batch):
     input_list = [s[0] for s in batch]
     target_list = [s[1] for s in batch]
-    pad_token = persona_dict.get_id('<pad>')
+    pad_token = wiki_dict.get_id('<pad>')
     input_tensor = pad_list_of_tensors(input_list, pad_token)
     target_tensor = pad_list_of_tensors(target_list, pad_token)
     return input_tensor, target_tensor
 
-persona_loaders = {}
+wiki_loaders = {}
 
 batch_size = 128
 
-for split, persona_dataset in persona_tensor_dataset.items():
-    persona_loaders[split] = DataLoader(persona_dataset, batch_size=batch_size, shuffle=True, collate_fn=pad_collate_fn)
+for split, wiki_dataset in wiki_tensor_dataset.items():
+    wiki_loaders[split] = DataLoader(wiki_dataset, batch_size=batch_size, shuffle=True, collate_fn=pad_collate_fn)
 
 num_gpus = torch.cuda.device_count()
 if num_gpus > 0:
@@ -192,7 +192,7 @@ def model_training(model, optimizer, num_epochs=100):
       avg_loss=0
       model.train()
       train_log_cache = []
-      for i, (inp, target) in enumerate(persona_loaders['train']):
+      for i, (inp, target) in enumerate(wiki_loaders['train']):
           optimizer.zero_grad()
           inp = inp.to(current_device)
           target = target.to(current_device)
@@ -207,7 +207,7 @@ def model_training(model, optimizer, num_epochs=100):
       valid_losses = []
       model.eval()
       with torch.no_grad():
-        for i, (inp, target) in enumerate(persona_loaders['valid']):
+        for i, (inp, target) in enumerate(wiki_loaders['valid']):
             inp = inp.to(current_device)
             target = target.to(current_device)
             logits = model(inp)
@@ -235,9 +235,9 @@ num_layers = 3
 lstm_dropout = 0.3
 
 options = {
-    'num_embeddings': len(persona_dict),
+    'num_embeddings': len(wiki_dict),
     'embedding_dim': embedding_size,
-    'padding_idx': persona_dict.get_id('<pad>'),
+    'padding_idx': wiki_dict.get_id('<pad>'),
     'input_size': embedding_size,
     'hidden_size': hidden_size,
     'num_layers': num_layers,
@@ -246,7 +246,7 @@ options = {
 
 LSTM_model_en = LSTMLanguageModel(options).to(current_device)
 
-criterion = nn.CrossEntropyLoss(ignore_index=persona_dict.get_id('<pad>'))
+criterion = nn.CrossEntropyLoss(ignore_index=wiki_dict.get_id('<pad>'))
 
 model_parameters = [p for p in LSTM_model_en.parameters() if p.requires_grad]
 optimizer = optim.SGD(model_parameters, lr=0.001, momentum=0.999)
@@ -257,3 +257,4 @@ torch.save({'model_state_dict': LSTM_model_en.state_dict(),
             'plot_cache': plot_en,
             'loss': loss,
             }, '/content/drive/My Drive/LSTM_model_en.pt')
+            
