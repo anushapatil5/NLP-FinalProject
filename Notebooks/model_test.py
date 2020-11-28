@@ -24,13 +24,16 @@ def load_wiki(basedir, use_chars=False):
         'valid': [],
         'test': [],
     }
+    print(datasets_fnames.items())
     for split, fname in datasets_fnames.items():
         for token_dict in jsonlines.open(fname):
             if(use_chars):
-                s = list(''.join(token_dict['tokens']))
-                datasets_text[split].append(s)
+                for i in range(len(token_dict)):
+                    s = list(''.join(token_dict[i]['tokens']))
+                    datasets_text[split].append(s)
             else:
-                datasets_text[split].append(token_dict['tokens'])
+                for i in range(len(token_dict)):
+                    datasets_text[split].append(token_dict[i]['tokens'])
     return datasets_text
 
 class Dictionary(object): #maps words to indices
@@ -38,22 +41,22 @@ class Dictionary(object): #maps words to indices
         self.tokens = []
         self.ids = {}
         self.counts = {}
-        
+
         # add special tokens
         self.add_token('<bos>') #beginning of sentence
         self.add_token('<eos>') #end of sentence
         self.add_token('<pad>')
         self.add_token('<unk>') #unknown. Needed in case use with text with word that isn't in vocab
-        
+
         for line in tqdm(datasets['train']):
             for w in line:
                 self.add_token(w)
-                    
+
         if include_valid is True:
             for line in tqdm(datasets['valid']):
                 for w in line:
                     self.add_token(w)
-                            
+
     def add_token(self, w):
         if w not in self.tokens:
             self.tokens.append(w)
@@ -65,22 +68,34 @@ class Dictionary(object): #maps words to indices
 
     def get_id(self, w):
         return self.ids[w]
-    
+
     def get_token(self, idx):
         return self.tokens[idx]
-    
+
     def decode_idx_seq(self, l):
         return [self.tokens[i] for i in l]
-    
+
     def encode_token_seq(self, l):
         return [self.ids[i] if i in self.ids else self.ids['<unk>'] for i in l]
-    
+
     def __len__(self):
         return len(self.tokens)
 
+def tokenize_dataset(datasets, dictionary, ngram_order=2):  # substitute words with numbers. Sometimes can include splitting strings, dealing with punctuation and symbols.
+    tokenized_datasets = {}
+    for split, dataset in datasets.items():
+        _current_dictified = []
+        for l in tqdm(dataset):
+            l = ['<bos>'] * (ngram_order - 1) + list(l) + ['<eos>']
+            encoded_l = dictionary.encode_token_seq(l)
+            _current_dictified.append(encoded_l)
+        tokenized_datasets[split] = _current_dictified
+
+    return tokenized_datasets
+
 USE_CHARS = False   # True to build a character dictionary
 
-wiki_dataset = load_wiki('./', use_chars=USE_CHARS)
+wiki_dataset = load_wiki('./data/en_json/', use_chars=USE_CHARS)
 wiki_dict = Dictionary(wiki_dataset, include_valid=True)
 
 wiki_tokenized_datasets = tokenize_dataset(wiki_dataset, wiki_dict)
@@ -94,18 +109,6 @@ def pad_strings(minibatch):
         padding_str = ' ' + '<pad> ' * (max_len_sample - line_len)
         result.append(line + padding_str)
     return result
-
-def tokenize_dataset(datasets, dictionary, ngram_order=2):  # substitute words with numbers. Sometimes can include splitting strings, dealing with punctuation and symbols.
-    tokenized_datasets = {}
-    for split, dataset in datasets.items():
-        _current_dictified = []
-        for l in tqdm(dataset):
-            l = ['<bos>'] * (ngram_order - 1) + l + ['<eos>']
-            encoded_l = dictionary.encode_token_seq(l)
-            _current_dictified.append(encoded_l)
-        tokenized_datasets[split] = _current_dictified
-
-    return tokenized_datasets
 
 class TensoredDataset():
     def __init__(self, list_of_lists_of_tokens):
@@ -162,7 +165,7 @@ if num_gpus > 0:
 else:
     current_device = 'cpu'
 
-class LSTMLanguageModel(nn.Module): 
+class LSTMLanguageModel(nn.Module):
     """
     This model combines embedding, lstm and projection layer into a single model
     """
@@ -172,15 +175,15 @@ class LSTMLanguageModel(nn.Module):
         self.lookup = nn.Embedding(num_embeddings=options['num_embeddings'], embedding_dim=options['embedding_dim'], padding_idx=options['padding_idx'])
         self.lstm = nn.LSTM(options['input_size'], options['hidden_size'], options['num_layers'], dropout=options['lstm_dropout'], batch_first=True)
         self.projection = nn.Linear(options['hidden_size'], options['num_embeddings'])
-        
+
     def forward(self, encoded_input_sequence):
         """
         Forward method process the input from token ids to logits
         """
         embeddings = self.lookup(encoded_input_sequence)
         lstm_outputs = self.lstm(embeddings)
-        logits = self.projection(lstm_outputs[0]) 
-        
+        logits = self.projection(lstm_outputs[0])
+
         return logits
 
 def model_training(model, optimizer, num_epochs=100):
@@ -203,7 +206,7 @@ def model_training(model, optimizer, num_epochs=100):
           train_log_cache.append(loss.item())
       avg_loss = sum(train_log_cache)/len(train_log_cache)
       print('Training loss after {} epoch = {:.{prec}f}'.format(epoch_number, avg_loss, prec=4))
-            
+
       valid_losses = []
       model.eval()
       with torch.no_grad():
@@ -216,12 +219,12 @@ def model_training(model, optimizer, num_epochs=100):
             valid_losses.append(loss.item())
         avg_val_loss = sum(valid_losses) / len(valid_losses)
         print('Validation loss after {} epoch = {:.{prec}f}'.format(epoch_number, avg_val_loss, prec=4))
-        
+
         if (avg_val_loss < best_loss):
           best_loss = avg_val_loss
         else:
           no_improvement += 1
-        
+
         if(no_improvement >= 5):
           print('Early stopping at epoch: %d', epoch_number)
           break
@@ -256,5 +259,4 @@ torch.save({'model_state_dict': LSTM_model_en.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             'plot_cache': plot_en,
             'loss': loss,
-            }, '/content/drive/My Drive/LSTM_model_en.pt')
-            
+            }, './saved_models/LSTM_model_en.pt')
