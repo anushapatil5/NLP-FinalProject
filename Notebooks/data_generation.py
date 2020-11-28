@@ -77,3 +77,4 @@ for key, text in all_text.items():
     with open(name, 'w') as outfile:
         json.dump(data, outfile)
 
+print("DONE")
