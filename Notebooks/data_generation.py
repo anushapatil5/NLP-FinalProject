@@ -29,7 +29,11 @@ python WikiExtractor.py -o data /Users/abdulrahimqaddoumi/Downloads/hiwiki-20201
 
 import os
 import json
-PATH = "/Users/abdulrahimqaddoumi/opt/anaconda3/lib/python3.7/site-packages/wikiextractor/data"
+from tqdm import tqdm
+
+
+#PATH = "/Users/abdulrahimqaddoumi/opt/anaconda3/lib/python3.7/site-packages/wikiextractor/ar"
+PATH = "/Users/abdulrahimqaddoumi/Desktop/en"
 LANGUAGES = ["en", "hi", "ar", "it"]
 
 
@@ -41,7 +45,7 @@ for subdir, dir, files in os.walk(PATH):
 
 
 texts = ""
-for file in files_path:
+for file in tqdm(files_path):
     f = open(file, "r")
     texts += f.read()
 
@@ -49,7 +53,7 @@ for file in files_path:
 # TODO Check spliting by (".") for Hindi
 texts = texts.split("\n")
 clean_texts = ""
-for text in texts:
+for text in tqdm(texts):
     if len(text) > 0 and text[:4] != "<doc" and text[:5] != "</doc":
         clean_texts += text
 
@@ -62,13 +66,14 @@ all_text = {"train": training_text, "test": test_text, "valid": valid_text}
 
 
 # TODO: Change LANGUAGES to change name
-data = []
+
+
 for key, text in all_text.items():
-    for sentence in text.split("."):
+    data = []
+    for sentence in tqdm(text.split(".")):
         data.append({"tokens": sentence.split(" ")})
-    name = LANGUAGES[1] + "_" + key + '.jsonl'
+    name = LANGUAGES[0] + "_" + key + '.jsonl'
+    print(len(data))
     with open(name, 'w') as outfile:
         json.dump(data, outfile)
 
-
-print("DONE")
