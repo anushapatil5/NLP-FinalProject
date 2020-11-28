@@ -37,7 +37,7 @@ LANGUAGES = ["en", "hi", "ar", "it"]
 
 def generate_clean_text(path=PATH):
     files_path = []
-    for subdir, dir, files in os.walk(PATH):
+    for subdir, dir, files in os.walk(path):
         for file in files:
             if file[0] == "w":
                 files_path.append(subdir + "/" + file)
