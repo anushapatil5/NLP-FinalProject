@@ -26,55 +26,54 @@ python WikiExtractor.py -o data /Users/abdulrahimqaddoumi/Downloads/hiwiki-20201
 6- Keep only the folders from AA-AE to keep things consistent because Hindi only have ~500MBs worth of data.
 """
 
-
 import os
 import json
 from tqdm import tqdm
 
-
-#PATH = "/Users/abdulrahimqaddoumi/opt/anaconda3/lib/python3.7/site-packages/wikiextractor/ar"
+# PATH = "/Users/abdulrahimqaddoumi/opt/anaconda3/lib/python3.7/site-packages/wikiextractor/ar"
 PATH = "/Users/abdulrahimqaddoumi/Desktop/en"
 LANGUAGES = ["en", "hi", "ar", "it"]
 
 
-files_path = []
-for subdir, dir, files in os.walk(PATH):
-    for file in files:
-        if file[0] == "w":
-            files_path.append(subdir + "/" + file)
+def generate_clean_text(path=PATH):
+    files_path = []
+    for subdir, dir, files in os.walk(PATH):
+        for file in files:
+            if file[0] == "w":
+                files_path.append(subdir + "/" + file)
+
+    texts = ""
+    for file in tqdm(files_path):
+        f = open(file, "r")
+        texts += f.read()
+
+    # TODO Check spliting by (".") for Hindi
+    texts = texts.split("\n")
+    clean_texts = ""
+    for text in tqdm(texts):
+        if len(text) > 0 and text[:4] != "<doc" and text[:5] != "</doc":
+            clean_texts += text
+    return clean_texts
 
 
-texts = ""
-for file in tqdm(files_path):
-    f = open(file, "r")
-    texts += f.read()
+def main():
+    clean_texts = generate_clean_text(PATH)
+    training_text = clean_texts[:int(len(clean_texts) * 0.8)]
+    remaining_text = clean_texts[int(len(clean_texts) * 0.8):]
+    test_text = remaining_text[:len(remaining_text) // 2]
+    valid_text = remaining_text[len(remaining_text) // 2:]
+    all_text = {"train": training_text, "test": test_text, "valid": valid_text}
+
+    # TODO: Change LANGUAGES to change name
+    for key, text in all_text.items():
+        data = []
+        for sentence in tqdm(text.split(".")):
+            data.append({"tokens": sentence.split(" ")})
+        name = LANGUAGES[0] + "_" + key + '.jsonl'
+        print(len(data))
+        with open(name, 'w') as outfile:
+            json.dump(data, outfile)
 
 
-# TODO Check spliting by (".") for Hindi
-texts = texts.split("\n")
-clean_texts = ""
-for text in tqdm(texts):
-    if len(text) > 0 and text[:4] != "<doc" and text[:5] != "</doc":
-        clean_texts += text
-
-
-training_text = clean_texts[:int(len(clean_texts) * 0.8)]
-remaining_text = clean_texts[int(len(clean_texts) * 0.8):]
-test_text = remaining_text[:len(remaining_text) // 2]
-valid_text = remaining_text[len(remaining_text) // 2:]
-all_text = {"train": training_text, "test": test_text, "valid": valid_text}
-
-
-# TODO: Change LANGUAGES to change name
-
-
-for key, text in all_text.items():
-    data = []
-    for sentence in tqdm(text.split(".")):
-        data.append({"tokens": sentence.split(" ")})
-    name = LANGUAGES[0] + "_" + key + '.jsonl'
-    print(len(data))
-    with open(name, 'w') as outfile:
-        json.dump(data, outfile)
-
-print("DONE")
+if __name__ == '__main__':
+    main()
