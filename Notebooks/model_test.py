@@ -24,15 +24,15 @@ def load_wiki(basedir, use_chars=False):
         'valid': [],
         'test': [],
     }
-    print(datasets_fnames.items())
     for split, fname in datasets_fnames.items():
         for token_dict in jsonlines.open(fname):
+            # print(token_dict)
             if(use_chars):
-                for i in range(len(token_dict)):
+                for i in range(10000):
                     s = list(''.join(token_dict[i]['tokens']))
                     datasets_text[split].append(s)
             else:
-                for i in range(len(token_dict)):
+                for i in range(10000):
                     datasets_text[split].append(token_dict[i]['tokens'])
     return datasets_text
 
@@ -82,6 +82,7 @@ class Dictionary(object): #maps words to indices
         return len(self.tokens)
 
 def tokenize_dataset(datasets, dictionary, ngram_order=2):  # substitute words with numbers. Sometimes can include splitting strings, dealing with punctuation and symbols.
+    print('start tokenizing')
     tokenized_datasets = {}
     for split, dataset in datasets.items():
         _current_dictified = []
@@ -90,16 +91,8 @@ def tokenize_dataset(datasets, dictionary, ngram_order=2):  # substitute words w
             encoded_l = dictionary.encode_token_seq(l)
             _current_dictified.append(encoded_l)
         tokenized_datasets[split] = _current_dictified
-
+    print('done tokenizing')
     return tokenized_datasets
-
-USE_CHARS = False   # True to build a character dictionary
-
-wiki_dataset = load_wiki('./data/en_json/', use_chars=USE_CHARS)
-wiki_dict = Dictionary(wiki_dataset, include_valid=True)
-
-wiki_tokenized_datasets = tokenize_dataset(wiki_dataset, wiki_dict)
-wiki_tensor_dataset = {}
 
 def pad_strings(minibatch):
     max_len_sample = max(len(i.split(' ')) for i in minibatch)
@@ -126,12 +119,6 @@ class TensoredDataset():
         # return a (input, target) tuple
         return (self.input_tensors[idx], self.target_tensors[idx])
 
-wiki_tokenized_datasets = tokenize_dataset(wiki_dataset, wiki_dict)
-wiki_tensor_dataset = {}
-
-for split, listoflists in wiki_tokenized_datasets.items():
-    wiki_tensor_dataset[split] = TensoredDataset(listoflists)
-
 def pad_list_of_tensors(list_of_tensors, pad_token):
     max_length = max([t.size(-1) for t in list_of_tensors])
     padded_list = []
@@ -143,7 +130,6 @@ def pad_list_of_tensors(list_of_tensors, pad_token):
     padded_tensor = torch.cat(padded_list, dim=0)
     return padded_tensor
 
-
 def pad_collate_fn(batch):
     input_list = [s[0] for s in batch]
     target_list = [s[1] for s in batch]
@@ -151,19 +137,6 @@ def pad_collate_fn(batch):
     input_tensor = pad_list_of_tensors(input_list, pad_token)
     target_tensor = pad_list_of_tensors(target_list, pad_token)
     return input_tensor, target_tensor
-
-wiki_loaders = {}
-
-batch_size = 128
-
-for split, wiki_dataset in wiki_tensor_dataset.items():
-    wiki_loaders[split] = DataLoader(wiki_dataset, batch_size=batch_size, shuffle=True, collate_fn=pad_collate_fn)
-
-num_gpus = torch.cuda.device_count()
-if num_gpus > 0:
-    current_device = 'cuda'
-else:
-    current_device = 'cpu'
 
 class LSTMLanguageModel(nn.Module):
     """
@@ -232,6 +205,39 @@ def model_training(model, optimizer, num_epochs=100):
 
   return plot_cache, best_loss
 
+import sys
+USE_CHARS = True if sys.argv[1]=='CHAR' else None
+USE_CHARS = False if sys.argv[1]=='WORD' else USE_CHARS
+
+type = 'char' if USE_CHARS == True else 'word'
+print('model type:',type)
+
+wiki_loaders = {}
+
+batch_size = 128
+
+num_gpus = torch.cuda.device_count()
+if num_gpus > 0:
+    current_device = 'cuda'
+else:
+    current_device = 'cpu'
+
+# USE_CHARS = False   # True to build a character dictionary
+
+print('start loading data')
+wiki_dataset = load_wiki('./data/en_json/', use_chars=USE_CHARS)
+print('done loading data')
+wiki_dict = Dictionary(wiki_dataset, include_valid=True)
+
+wiki_tokenized_datasets = tokenize_dataset(wiki_dataset, wiki_dict)
+wiki_tensor_dataset = {}
+
+for split, listoflists in wiki_tokenized_datasets.items():
+    wiki_tensor_dataset[split] = TensoredDataset(listoflists)
+
+for split, wiki_dataset in wiki_tensor_dataset.items():
+    wiki_loaders[split] = DataLoader(wiki_dataset, batch_size=batch_size, shuffle=True, collate_fn=pad_collate_fn)
+
 embedding_size = 256
 hidden_size = 1024
 num_layers = 3
@@ -259,4 +265,4 @@ torch.save({'model_state_dict': LSTM_model_en.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             'plot_cache': plot_en,
             'loss': loss,
-            }, './saved_models/LSTM_model_en.pt')
+            }, './saved_models/LSTM_'+type+'_model_en.pt')
