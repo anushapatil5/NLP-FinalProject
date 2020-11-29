@@ -159,7 +159,7 @@ class LSTMLanguageModel(nn.Module):
 
         return logits
 
-def model_training(model, optimizer, num_epochs=100):
+def model_training(model, optimizer, num_epochs=30):
   plot_cache = []
   best_loss = float(inf)
   no_improvement = 0
@@ -260,7 +260,7 @@ criterion = nn.CrossEntropyLoss(ignore_index=wiki_dict.get_id('<pad>'))
 model_parameters = [p for p in LSTM_model_en.parameters() if p.requires_grad]
 optimizer = optim.SGD(model_parameters, lr=0.001, momentum=0.999)
 
-plot_en, loss = model_training(LSTM_model_en, optimizer, 100)
+plot_en, loss = model_training(LSTM_model_en, optimizer, 30)
 torch.save({'model_state_dict': LSTM_model_en.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             'plot_cache': plot_en,
