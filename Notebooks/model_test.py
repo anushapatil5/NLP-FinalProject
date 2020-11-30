@@ -270,4 +270,4 @@ if __name__ == '__main__':
                 'optimizer_state_dict': optimizer.state_dict(),
                 'plot_cache': plot_en,
                 'loss': loss,
-                }, './saved_models/LSTM_'+type+'_'+'_'+str(NUM_TOKEN)+'_tklen'+str(NUM_EPOCHS)+'ep_model_en.pt')
+                }, './saved_models/LSTM_'+type+'_'+str(NUM_TOKEN)+'_tklen'+str(NUM_EPOCHS)+'ep_model_en.pt')
