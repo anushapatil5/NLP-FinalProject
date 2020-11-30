@@ -210,13 +210,14 @@ if __name__ == '__main__':
     USE_CHARS = False if sys.argv[1]=='WORD' else USE_CHARS
     NUM_EPOCHS = int(sys.argv[2]) if len(sys.argv)>2 else 100
     NUM_TOKEN = int(sys.argv[3]) if len(sys.argv)>3 else 10000
+    BATCH_SIZE = int(sys.argv[4]) if len(sys.argv)>4 else 128
 
     type = 'char' if USE_CHARS == True else 'word'
     print('model type:', type)
 
     wiki_loaders = {}
 
-    batch_size = 128
+    batch_size = BATCH_SIZE
     print('batch size:', batch_size)
 
     num_gpus = torch.cuda.device_count()
@@ -264,10 +265,11 @@ if __name__ == '__main__':
 
     model_parameters = [p for p in LSTM_model_en.parameters() if p.requires_grad]
     optimizer = optim.SGD(model_parameters, lr=0.001, momentum=0.999)
-
+    filename = './saved_models/LSTM_en_'+type+'_'+str(NUM_TOKEN)+'tklen_'+str(BATCH_SIZE)+'bsize_'+str(NUM_EPOCHS)+'ep.pt'
     plot_en, loss = model_training(model=LSTM_model_en, optimizer=optimizer, num_epochs=NUM_EPOCHS)
     torch.save({'model_state_dict': LSTM_model_en.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'plot_cache': plot_en,
                 'loss': loss,
-                }, './saved_models/LSTM_'+type+'_'+str(NUM_TOKEN)+'_tklen'+str(NUM_EPOCHS)+'ep_model_en.pt')
+                }, filename)
+    print(filename)
