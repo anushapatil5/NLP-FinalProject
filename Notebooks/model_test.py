@@ -13,7 +13,7 @@ import numpy as np
 from numpy import inf
 import matplotlib.pyplot as plt
 
-def load_wiki(basedir, use_chars=False):
+def load_wiki(basedir, NUM_TOKEN, use_chars=False):
     datasets_fnames = {
         'train': os.path.join(basedir, 'en_train.jsonl'),
         'valid': os.path.join(basedir, 'en_valid.jsonl'),
@@ -28,11 +28,11 @@ def load_wiki(basedir, use_chars=False):
         for token_dict in jsonlines.open(fname):
             # print(token_dict)
             if(use_chars):
-                for i in range(10000):
+                for i in range(NUM_TOKEN):
                     s = list(''.join(token_dict[i]['tokens']))
                     datasets_text[split].append(s)
             else:
-                for i in range(10000):
+                for i in range(NUM_TOKEN):
                     datasets_text[split].append(token_dict[i]['tokens'])
     return datasets_text
 
@@ -82,7 +82,6 @@ class Dictionary(object): #maps words to indices
         return len(self.tokens)
 
 def tokenize_dataset(datasets, dictionary, ngram_order=2):  # substitute words with numbers. Sometimes can include splitting strings, dealing with punctuation and symbols.
-    print('start tokenizing')
     tokenized_datasets = {}
     for split, dataset in datasets.items():
         _current_dictified = []
@@ -91,7 +90,6 @@ def tokenize_dataset(datasets, dictionary, ngram_order=2):  # substitute words w
             encoded_l = dictionary.encode_token_seq(l)
             _current_dictified.append(encoded_l)
         tokenized_datasets[split] = _current_dictified
-    print('done tokenizing')
     return tokenized_datasets
 
 def pad_strings(minibatch):
@@ -159,7 +157,7 @@ class LSTMLanguageModel(nn.Module):
 
         return logits
 
-def model_training(model, optimizer, num_epochs=30):
+def model_training(model, optimizer, num_epochs):
   plot_cache = []
   best_loss = float(inf)
   no_improvement = 0
@@ -205,64 +203,71 @@ def model_training(model, optimizer, num_epochs=30):
 
   return plot_cache, best_loss
 
-import sys
-USE_CHARS = True if sys.argv[1]=='CHAR' else None
-USE_CHARS = False if sys.argv[1]=='WORD' else USE_CHARS
+if __name__ == '__main__':
+    # Usage: python model_test.py CHAR/WORD NUM_EPOCHS NUM_TOKEN
+    import sys
+    USE_CHARS = True if sys.argv[1]=='CHAR' else None
+    USE_CHARS = False if sys.argv[1]=='WORD' else USE_CHARS
+    NUM_EPOCHS = int(sys.argv[2]) if len(sys.argv)>2 else 100
+    NUM_TOKEN = int(sys.argv[3]) if len(sys.argv)>3 else 10000
 
-type = 'char' if USE_CHARS == True else 'word'
-print('model type:',type)
+    type = 'char' if USE_CHARS == True else 'word'
+    print('model type:', type)
 
-wiki_loaders = {}
+    wiki_loaders = {}
 
-batch_size = 128
+    batch_size = 128
+    print('batch size:', batch_size)
 
-num_gpus = torch.cuda.device_count()
-if num_gpus > 0:
-    current_device = 'cuda'
-else:
-    current_device = 'cpu'
+    num_gpus = torch.cuda.device_count()
+    if num_gpus > 0:
+        current_device = 'cuda'
+    else:
+        current_device = 'cpu'
+    print('device:', current_device)
 
-# USE_CHARS = False   # True to build a character dictionary
+    # print('start loading data')
+    wiki_dataset = load_wiki('./data/en_json/', use_chars=USE_CHARS, NUM_TOKEN=NUM_TOKEN)
+    # print('done loading data')
+    wiki_dict = Dictionary(wiki_dataset, include_valid=True)
 
-print('start loading data')
-wiki_dataset = load_wiki('./data/en_json/', use_chars=USE_CHARS)
-print('done loading data')
-wiki_dict = Dictionary(wiki_dataset, include_valid=True)
+    # print('start tokenizing')
+    wiki_tokenized_datasets = tokenize_dataset(wiki_dataset, wiki_dict)
+    # print('done tokenizing')
+    wiki_tensor_dataset = {}
 
-wiki_tokenized_datasets = tokenize_dataset(wiki_dataset, wiki_dict)
-wiki_tensor_dataset = {}
+    for split, listoflists in wiki_tokenized_datasets.items():
+        wiki_tensor_dataset[split] = TensoredDataset(listoflists)
 
-for split, listoflists in wiki_tokenized_datasets.items():
-    wiki_tensor_dataset[split] = TensoredDataset(listoflists)
+    for split, wiki_dataset in wiki_tensor_dataset.items():
+        wiki_loaders[split] = DataLoader(wiki_dataset, batch_size=batch_size, shuffle=True, collate_fn=pad_collate_fn)
 
-for split, wiki_dataset in wiki_tensor_dataset.items():
-    wiki_loaders[split] = DataLoader(wiki_dataset, batch_size=batch_size, shuffle=True, collate_fn=pad_collate_fn)
+    embedding_size = 256
+    hidden_size = 1024
+    num_layers = 3
+    lstm_dropout = 0.3
 
-embedding_size = 256
-hidden_size = 1024
-num_layers = 3
-lstm_dropout = 0.3
+    options = {
+        'num_embeddings': len(wiki_dict),
+        'embedding_dim': embedding_size,
+        'padding_idx': wiki_dict.get_id('<pad>'),
+        'input_size': embedding_size,
+        'hidden_size': hidden_size,
+        'num_layers': num_layers,
+        'lstm_dropout': lstm_dropout,
+    }
+    print(options)
 
-options = {
-    'num_embeddings': len(wiki_dict),
-    'embedding_dim': embedding_size,
-    'padding_idx': wiki_dict.get_id('<pad>'),
-    'input_size': embedding_size,
-    'hidden_size': hidden_size,
-    'num_layers': num_layers,
-    'lstm_dropout': lstm_dropout,
-}
+    LSTM_model_en = LSTMLanguageModel(options).to(current_device)
 
-LSTM_model_en = LSTMLanguageModel(options).to(current_device)
+    criterion = nn.CrossEntropyLoss(ignore_index=wiki_dict.get_id('<pad>'))
 
-criterion = nn.CrossEntropyLoss(ignore_index=wiki_dict.get_id('<pad>'))
+    model_parameters = [p for p in LSTM_model_en.parameters() if p.requires_grad]
+    optimizer = optim.SGD(model_parameters, lr=0.001, momentum=0.999)
 
-model_parameters = [p for p in LSTM_model_en.parameters() if p.requires_grad]
-optimizer = optim.SGD(model_parameters, lr=0.001, momentum=0.999)
-
-plot_en, loss = model_training(LSTM_model_en, optimizer, 30)
-torch.save({'model_state_dict': LSTM_model_en.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'plot_cache': plot_en,
-            'loss': loss,
-            }, './saved_models/LSTM_'+type+'_model_en.pt')
+    plot_en, loss = model_training(model=LSTM_model_en, optimizer=optimizer, num_epochs=NUM_EPOCHS)
+    torch.save({'model_state_dict': LSTM_model_en.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'plot_cache': plot_en,
+                'loss': loss,
+                }, './saved_models/LSTM_'+type+'_'+'_'+str(NUM_TOKEN)+'_tklen'+str(NUM_EPOCHS)+'ep_model_en.pt')
