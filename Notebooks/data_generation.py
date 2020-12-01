@@ -24,18 +24,17 @@ python WikiExtractor.py -o data /Users/abdulrahimqaddoumi/Downloads/hiwiki-20201
 5- The results should be Folders starting from AA, AB, AC, ... etc. Each folder will have text files named wiki_00, wiki_01, ... etc.
 
 6- Keep only the folders from AA-AE to keep things consistent because Hindi only have ~500MBs worth of data.
+
+Usage: python data_genration.py LANG
+e.g. python data_genration.py en
 """
 
+import sys
 import os
 import json
 from tqdm import tqdm
 
-# PATH = "/Users/abdulrahimqaddoumi/opt/anaconda3/lib/python3.7/site-packages/wikiextractor/ar"
-PATH = "/Users/abdulrahimqaddoumi/Desktop/en"
-LANGUAGES = ["en", "hi", "ar", "it"]
-
-
-def generate_clean_text(path=PATH):
+def generate_clean_text(path):
     files_path = []
     for subdir, dir, files in os.walk(path):
         for file in files:
@@ -56,8 +55,10 @@ def generate_clean_text(path=PATH):
     return clean_texts
 
 
-def main():
+def main(LANGUAGE, PATH):
+    # This first line takes the text from Wikipedia articles and split it by "\n". Then remove some tags <doc> and </doc>
     clean_texts = generate_clean_text(PATH)
+    # This is just splitting the training, test and validation datasets and store them in a dictionary.
     training_text = clean_texts[:int(len(clean_texts) * 0.8)]
     remaining_text = clean_texts[int(len(clean_texts) * 0.8):]
     test_text = remaining_text[:len(remaining_text) // 2]
@@ -65,15 +66,18 @@ def main():
     all_text = {"train": training_text, "test": test_text, "valid": valid_text}
 
     # TODO: Change LANGUAGES to change name
+    # This loops through the dictionary and split each paragraphs into sentences "." and then split the sentence into tokens " " and then dumps a json file
     for key, text in all_text.items():
         data = []
         for sentence in tqdm(text.split(".")):
             data.append({"tokens": sentence.split(" ")})
-        name = LANGUAGES[0] + "_" + key + '.jsonl'
+        name = LANGUAGE + "_" + key + '.jsonl'
         print(len(data))
         with open(name, 'w') as outfile:
             json.dump(data, outfile)
 
 
 if __name__ == '__main__':
-    main()
+    LANGUAGE = sys.argv[1]
+    PATH = "~/Desktop/"+str(LANGUAGE)
+    main(LANGUAGE, PATH)
