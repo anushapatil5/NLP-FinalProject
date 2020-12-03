@@ -79,13 +79,13 @@ class LSTMLanguageModel(nn.Module):
         """
         Forward method process the input from token ids to logits
         """
-        print('encoded_input_sequence')
-        print(encoded_input_sequence.size())
-        print(encoded_input_sequence[0])
+        # print('encoded_input_sequence')
+        # print(encoded_input_sequence.size())
+        # print(encoded_input_sequence[0])
         embeddings = self.lookup(encoded_input_sequence)
-        print('embeddings')
-        print(embeddings.size())
-        print(embeddings[0])
+        # print('embeddings')
+        # print(embeddings.size())
+        # print(embeddings[0])
         lstm_outputs = self.lstm(embeddings)
         logits = self.projection(lstm_outputs[0])
 
@@ -206,7 +206,7 @@ if __name__ == '__main__':
     options = {
         'num_embeddings': num_embeddings,
         'embedding_dim': embedding_size,
-        'padding_idx': 3, #wiki_dict.get_id('<pad>')
+        'padding_idx': 2, #wiki_dict.get_id('<pad>')
         'input_size': embedding_size,
         'hidden_size': hidden_size,
         'num_layers': num_layers,
