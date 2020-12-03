@@ -79,7 +79,13 @@ class LSTMLanguageModel(nn.Module):
         """
         Forward method process the input from token ids to logits
         """
+        print('encoded_input_sequence')
+        print(encoded_input_sequence.size())
+        print(encoded_input_sequence[0])
         embeddings = self.lookup(encoded_input_sequence)
+        print('embeddings')
+        print(embeddings.size())
+        print(embeddings[0])
         lstm_outputs = self.lstm(embeddings)
         logits = self.projection(lstm_outputs[0])
 
@@ -191,7 +197,7 @@ if __name__ == '__main__':
         wiki_loaders[split] = DataLoader(wiki_dataset, batch_size=batch_size, shuffle=True, collate_fn=pad_collate_fn)
 
     embedding_size = 256
-    hidden_size = 512
+    hidden_size = 1024
     num_layers = 2
     lstm_dropout = 0.3
     if LANG == 'en':

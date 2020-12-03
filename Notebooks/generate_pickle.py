@@ -136,29 +136,34 @@ if __name__ == '__main__':
 
         # convert tokens into unk and change their ids to unk's id.
         print('len of dict before filtering:',len(wiki_dict))
-        for token in wiki_dict.tokens:
-          if token not in res:
-            id = wiki_dict.get_id(token)
-            print(token, id)
-            wiki_dict.tokens[id] = '<unk>'
-            wiki_dict.ids[token] = 3
+        new_wiki_dict = {}
+        new_tokens = []
 
-        print('len of dict after filtering:',len(res))
+        for token in wiki_dict.tokens:
+          if token in res:
+            new_wiki_dict[token] = wiki_dict.ids[token]
+            new_tokens.append(token)
+
+        wiki_dict.ids = new_wiki_dict
+        wiki_dict.tokens = new_tokens
+        print('len of dict after filtering:',len(wiki_dict.ids))
 
     else:
         sorted_counts_word = {k: v for k, v in sorted(wiki_dict.counts.items(), key=lambda item: item[1])}
         res_word = {k: v for k, v in sorted_counts_word.items() if v > 100}
 
         # convert tokens into unk and change their ids to unk's id.
-        print('len of dict before filtering:',len(wiki_dict))
-        for token in wiki_dict.tokens:
-          if token not in res_word:
-            id = wiki_dict.get_id(token)
-            print(token, id)
-            wiki_dict.tokens[id] = '<unk>'
-            wiki_dict.ids[token] = 3
+        new_wiki_dict = {}
+        new_tokens = []
 
-        print('len of dict after filtering:',len(res_word))
+        for token in wiki_dict.tokens:
+          if token in res_word:
+            new_wiki_dict[token] = wiki_dict.ids[token]
+            new_tokens.append(token)
+
+        wiki_dict.ids = new_wiki_dict
+        wiki_dict.tokens = new_tokens
+        print('len of dict after filtering:',len(wiki_dict.ids))
 
     print('start tokenizing')
     wiki_tokenized_datasets = tokenize_dataset(path, wiki_dict)
