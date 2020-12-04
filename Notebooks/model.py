@@ -14,6 +14,7 @@ from numpy import inf
 import matplotlib.pyplot as plt
 import pickle
 from generate_pickle import Dictionary
+import time
 
 def load_pickle(path):
     with open(path, 'rb') as handle:
@@ -59,7 +60,7 @@ def pad_list_of_tensors(list_of_tensors, pad_token):
 def pad_collate_fn(batch):
     input_list = [s[0] for s in batch]
     target_list = [s[1] for s in batch]
-    pad_token = 3 # wiki_dict.get_id('<pad>')
+    pad_token = 2 # wiki_dict.get_id('<pad>')
     input_tensor = pad_list_of_tensors(input_list, pad_token)
     target_tensor = pad_list_of_tensors(target_list, pad_token)
     return input_tensor, target_tensor
@@ -79,13 +80,7 @@ class LSTMLanguageModel(nn.Module):
         """
         Forward method process the input from token ids to logits
         """
-        # print('encoded_input_sequence')
-        # print(encoded_input_sequence.size())
-        # print(encoded_input_sequence[0])
         embeddings = self.lookup(encoded_input_sequence)
-        # print('embeddings')
-        # print(embeddings.size())
-        # print(embeddings[0])
         lstm_outputs = self.lstm(embeddings)
         logits = self.projection(lstm_outputs[0])
 
@@ -100,6 +95,7 @@ def model_training(model, optimizer, num_epochs):
       avg_loss=0
       model.train()
       train_log_cache = []
+      start_time = time.time()
       for i, (inp, target) in enumerate(wiki_loaders['train']):
           optimizer.zero_grad()
           inp = inp.to(current_device)
@@ -117,6 +113,7 @@ def model_training(model, optimizer, num_epochs):
       avg_loss = sum(train_log_cache)/len(train_log_cache)
       torch.cuda.empty_cache()
       print('Training loss after {} epoch = {:.{prec}f}'.format(epoch_number+1, avg_loss, prec=4))
+      print(time.time()-start_time)
 
       valid_losses = []
       model.eval()
@@ -188,6 +185,11 @@ if __name__ == '__main__':
     wiki_tokenized_datasets = load_pickle(path=PATH)
     print('done loading')
 
+    wiki_path = LANG+'_'+type+'_wiki_dict_filtered.pickle'
+    with open(wiki_path, 'rb') as handle:
+        wiki_dict = pickle.load(handle)
+    print(len(wiki_dict.ids))
+
     wiki_tensor_dataset = {}
 
     for split, listoflists in wiki_tokenized_datasets.items():
@@ -196,12 +198,14 @@ if __name__ == '__main__':
     for split, wiki_dataset in wiki_tensor_dataset.items():
         wiki_loaders[split] = DataLoader(wiki_dataset, batch_size=batch_size, shuffle=True, collate_fn=pad_collate_fn)
 
-    embedding_size = 256
-    hidden_size = 1024
+    embedding_size = int(256)
+    hidden_size = int(1024)
     num_layers = 2
     lstm_dropout = 0.3
-    if LANG == 'en':
-        num_embeddings = 97
+    if USE_CHARS:
+        num_embeddings = len(wiki_dict.ids)
+    if (not USE_CHARS):
+        num_embeddings = len(wiki_dict.ids)
 
     options = {
         'num_embeddings': num_embeddings,
@@ -220,7 +224,7 @@ if __name__ == '__main__':
 
     model_parameters = [p for p in LSTM_model.parameters() if p.requires_grad]
     optimizer = optim.SGD(model_parameters, lr=0.001, momentum=0.999)
-    filename = './saved_models/LSTM_'+LANG+'_'+type+'_'+str(BATCH_SIZE)+'bsize_'+str(NUM_EPOCHS)+'ep.pt'
+    filename = './saved_models/LSTM_'+LANG+'_'+type+'_'+str(BATCH_SIZE)+'bsize_'+str(embedding_size)+'emb_'+str(hidden_size)+'hdim_'+str(num_layers)+'lyrs_'+str(NUM_EPOCHS)+'ep.pt'
     plot, loss = model_training(model=LSTM_model, optimizer=optimizer, num_epochs=NUM_EPOCHS)
     torch.save({'model_state_dict': LSTM_model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
