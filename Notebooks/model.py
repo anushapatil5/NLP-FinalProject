@@ -220,7 +220,7 @@ if __name__ == '__main__':
 
     LSTM_model = LSTMLanguageModel(options).to(current_device)
 
-    criterion = nn.CrossEntropyLoss(ignore_index=3) #wiki_dict.get_id('<pad>')
+    criterion = nn.CrossEntropyLoss(ignore_index=2) #wiki_dict.get_id('<pad>')
 
     model_parameters = [p for p in LSTM_model.parameters() if p.requires_grad]
     optimizer = optim.SGD(model_parameters, lr=0.001, momentum=0.999)
